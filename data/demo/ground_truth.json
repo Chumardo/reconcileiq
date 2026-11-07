@@ -1,0 +1,560 @@
+{
+  "schema_version": 1,
+  "description": "All data is synthetic. Each untouched baseline index produces one matched pair.",
+  "seed": 1729,
+  "baseline_pairs": 10000,
+  "baseline_row_id_formats": {
+    "a": "A-{index:05d}",
+    "b": "B-{index:05d}"
+  },
+  "scenarios": [
+    {
+      "name": "Missing in the ledger",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "delete",
+          "row_id": "A-00001",
+          "before": {
+            "row_id": "A-00001",
+            "merchant": "SYNTH-001",
+            "transaction": "000001",
+            "amount": "-264.22",
+            "status": "PENDING",
+            "currency": "GBP"
+          },
+          "after": null
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": null,
+          "row_id_b": "B-00001",
+          "classification": "missing_in_source_a",
+          "flags": [
+            "missing_in_source_a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Missing in the settlement export",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "delete",
+          "row_id": "B-00002",
+          "before": {
+            "row_id": "B-00002",
+            "merchant": "SYNTH-002",
+            "transaction": "000001",
+            "amount": "1899.76",
+            "status": "PAID",
+            "currency": "GBP"
+          },
+          "after": null
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00002",
+          "row_id_b": null,
+          "classification": "missing_in_source_b",
+          "flags": [
+            "missing_in_source_b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ledger amount differs by one cent",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "update",
+          "row_id": "A-00003",
+          "before": {
+            "row_id": "A-00003",
+            "merchant": "SYNTH-003",
+            "transaction": "000001",
+            "amount": "-195.00",
+            "status": "PAID",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "A-00003",
+            "merchant": "SYNTH-003",
+            "transaction": "000001",
+            "amount": "-194.99",
+            "status": "PAID",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00003",
+          "row_id_b": "B-00003",
+          "classification": "amount_mismatch",
+          "flags": [
+            "amount_mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Settlement status differs",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00004",
+          "before": {
+            "row_id": "B-00004",
+            "merchant": "SYNTH-004",
+            "transaction": "000001",
+            "amount": "2225.79",
+            "status": "PENDING",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "B-00004",
+            "merchant": "SYNTH-004",
+            "transaction": "000001",
+            "amount": "2225.79",
+            "status": "REVERSED",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00004",
+          "row_id_b": "B-00004",
+          "classification": "status_mismatch",
+          "flags": [
+            "status_mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Both amount and status differ",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00005",
+          "before": {
+            "row_id": "B-00005",
+            "merchant": "SYNTH-005",
+            "transaction": "000001",
+            "amount": "588.69",
+            "status": "PAID",
+            "currency": "GBP"
+          },
+          "after": {
+            "row_id": "B-00005",
+            "merchant": "SYNTH-005",
+            "transaction": "000001",
+            "amount": "588.71",
+            "status": "REVERSED",
+            "currency": "GBP"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00005",
+          "row_id_b": "B-00005",
+          "classification": "amount_mismatch",
+          "flags": [
+            "amount_mismatch",
+            "status_mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Duplicate ledger key also quarantines the singleton settlement row",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "insert",
+          "row_id": "A-D0006",
+          "before": null,
+          "after": {
+            "row_id": "A-D0006",
+            "merchant": "SYNTH-006",
+            "transaction": "000001",
+            "amount": "2376.35",
+            "status": "PENDING",
+            "currency": "USD"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00006",
+          "row_id_b": null,
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        },
+        {
+          "row_id_a": "A-D0006",
+          "row_id_b": null,
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        },
+        {
+          "row_id_a": null,
+          "row_id_b": "B-00006",
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Two duplicates on each side require four standalone results",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "insert",
+          "row_id": "A-D0007",
+          "before": null,
+          "after": {
+            "row_id": "A-D0007",
+            "merchant": "SYNTH-007",
+            "transaction": "000001",
+            "amount": "1896.08",
+            "status": "PENDING",
+            "currency": "EUR"
+          }
+        },
+        {
+          "source": "b",
+          "operation": "insert",
+          "row_id": "B-D0007",
+          "before": null,
+          "after": {
+            "row_id": "B-D0007",
+            "merchant": "SYNTH-007",
+            "transaction": "000001",
+            "amount": "1896.08",
+            "status": "PENDING",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00007",
+          "row_id_b": null,
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        },
+        {
+          "row_id_a": "A-D0007",
+          "row_id_b": null,
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        },
+        {
+          "row_id_a": null,
+          "row_id_b": "B-00007",
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        },
+        {
+          "row_id_a": null,
+          "row_id_b": "B-D0007",
+          "classification": "duplicate_key",
+          "flags": [
+            "duplicate_key"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Blank ledger merchant component leaves the settlement key unmatched",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "update",
+          "row_id": "A-00008",
+          "before": {
+            "row_id": "A-00008",
+            "merchant": "SYNTH-008",
+            "transaction": "000001",
+            "amount": "1359.90",
+            "status": "FAILED",
+            "currency": "GBP"
+          },
+          "after": {
+            "row_id": "A-00008",
+            "merchant": "",
+            "transaction": "000001",
+            "amount": "1359.90",
+            "status": "FAILED",
+            "currency": "GBP"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00008",
+          "row_id_b": null,
+          "classification": "invalid_key",
+          "flags": [
+            "null_key"
+          ]
+        },
+        {
+          "row_id_a": null,
+          "row_id_b": "B-00008",
+          "classification": "missing_in_source_a",
+          "flags": [
+            "missing_in_source_a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Blank settlement transaction component leaves the ledger key unmatched",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00009",
+          "before": {
+            "row_id": "B-00009",
+            "merchant": "SYNTH-009",
+            "transaction": "000001",
+            "amount": "1652.71",
+            "status": "FAILED",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "B-00009",
+            "merchant": "SYNTH-009",
+            "transaction": "",
+            "amount": "1652.71",
+            "status": "FAILED",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00009",
+          "row_id_b": null,
+          "classification": "missing_in_source_b",
+          "flags": [
+            "missing_in_source_b"
+          ]
+        },
+        {
+          "row_id_a": null,
+          "row_id_b": "B-00009",
+          "classification": "invalid_key",
+          "flags": [
+            "null_key"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Formatted amount has an unsupported grouping separator",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "update",
+          "row_id": "A-00010",
+          "before": {
+            "row_id": "A-00010",
+            "merchant": "SYNTH-010",
+            "transaction": "000001",
+            "amount": "2376.94",
+            "status": "PAID",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "A-00010",
+            "merchant": "SYNTH-010",
+            "transaction": "000001",
+            "amount": "1,234.56",
+            "status": "PAID",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00010",
+          "row_id_b": "B-00010",
+          "classification": "invalid_value",
+          "flags": [
+            "invalid_amount"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Blank settlement status",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00011",
+          "before": {
+            "row_id": "B-00011",
+            "merchant": "SYNTH-011",
+            "transaction": "000001",
+            "amount": "-204.42",
+            "status": "FAILED",
+            "currency": "USD"
+          },
+          "after": {
+            "row_id": "B-00011",
+            "merchant": "SYNTH-011",
+            "transaction": "000001",
+            "amount": "-204.42",
+            "status": "",
+            "currency": "USD"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00011",
+          "row_id_b": "B-00011",
+          "classification": "invalid_value",
+          "flags": [
+            "invalid_status"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Different currencies prevent an amount comparison",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00012",
+          "before": {
+            "row_id": "B-00012",
+            "merchant": "SYNTH-012",
+            "transaction": "000001",
+            "amount": "11.42",
+            "status": "FAILED",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "B-00012",
+            "merchant": "SYNTH-012",
+            "transaction": "000001",
+            "amount": "11.42",
+            "status": "FAILED",
+            "currency": "CAD"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00012",
+          "row_id_b": "B-00012",
+          "classification": "currency_mismatch",
+          "flags": [
+            "currency_mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Currency value contains an invalid character",
+      "mutations": [
+        {
+          "source": "a",
+          "operation": "update",
+          "row_id": "A-00013",
+          "before": {
+            "row_id": "A-00013",
+            "merchant": "SYNTH-013",
+            "transaction": "000001",
+            "amount": "2488.17",
+            "status": "PENDING",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "A-00013",
+            "merchant": "SYNTH-013",
+            "transaction": "000001",
+            "amount": "2488.17",
+            "status": "PENDING",
+            "currency": "US$"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00013",
+          "row_id_b": "B-00013",
+          "classification": "invalid_value",
+          "flags": [
+            "invalid_currency"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invalid settlement amount and independent status mismatch",
+      "mutations": [
+        {
+          "source": "b",
+          "operation": "update",
+          "row_id": "B-00014",
+          "before": {
+            "row_id": "B-00014",
+            "merchant": "SYNTH-014",
+            "transaction": "000001",
+            "amount": "-474.07",
+            "status": "FAILED",
+            "currency": "EUR"
+          },
+          "after": {
+            "row_id": "B-00014",
+            "merchant": "SYNTH-014",
+            "transaction": "000001",
+            "amount": "NaN",
+            "status": "REVERSED",
+            "currency": "EUR"
+          }
+        }
+      ],
+      "expected_records": [
+        {
+          "row_id_a": "A-00014",
+          "row_id_b": "B-00014",
+          "classification": "invalid_value",
+          "flags": [
+            "invalid_amount",
+            "status_mismatch"
+          ]
+        }
+      ]
+    }
+  ]
+}

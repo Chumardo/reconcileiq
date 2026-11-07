@@ -1,0 +1,56 @@
+# Local Python environments and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Credentials and machine-specific settings
+.streamlit/secrets.toml
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+
+# Local source files and generated audit outputs
+/output/
+/private/
+/uploads/
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.tsv
+*.parquet
+*.duckdb
+report.json
+/data/*
+!/data/demo/
+/data/demo/*
+!/data/demo/config.json
+!/data/demo/ground_truth.json
+!/data/demo/source_a.csv
+!/data/demo/source_b.csv
+
+# Curated portfolio screenshots
+/docs/screenshots/*
+!/docs/screenshots/phase4-overview.jpg
+!/docs/screenshots/phase4-explorer.jpg
+!/docs/screenshots/phase4-excel-report.jpg

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reconcileiq"
+version = "0.1.0"
+description = "Traceable transaction reconciliation and data quality auditing"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.2,<2",
+    "openpyxl>=3.1,<4",
+    "pandas>=2.2,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+ui = ["streamlit>=1.65,<2", "altair>=5.5,<7"]
+
+[project.scripts]
+reconcileiq = "reconcileiq.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

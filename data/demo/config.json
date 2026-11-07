@@ -1,0 +1,22 @@
+{
+  "source_a": {
+    "keys": [
+      "merchant_id",
+      "transaction_id"
+    ],
+    "amount": "booked_amount",
+    "status": "ledger_status",
+    "currency": "currency",
+    "row_id": "ledger_row"
+  },
+  "source_b": {
+    "keys": [
+      "merchant_ref",
+      "payment_ref"
+    ],
+    "amount": "settled_amount",
+    "status": "bank_status",
+    "currency": "ccy",
+    "row_id": "bank_row"
+  }
+}
