@@ -2,6 +2,12 @@
 
 ReconcileIQ compares two transaction sources, explains differences, and produces an Excel audit report with a trace back to the original rows. It is a self-directed portfolio project for financial operations and data quality. All bundled records, examples, and screenshots use synthetic data.
 
+**[🚀 Try the Live Demo](https://reconcileiq-demo.streamlit.app/)**
+
+Explore the interactive reconciliation dashboard, investigate synthetic transaction discrepancies, and review downloadable Excel audit reports. No installation required.
+
+The public demo uses synthetic data and disables file uploads.
+
 ![ReconcileIQ overview showing the synthetic demo’s match rate, eligible exceptions, and quarantined records](docs/screenshots/phase4-overview.jpg)
 
 [Exception Explorer](docs/screenshots/phase4-explorer.jpg) · [Excel audit report](docs/screenshots/phase4-excel-report.jpg) · [Case study](docs/case_study.md) · [Upwork portfolio materials](docs/upwork_portfolio.md)
