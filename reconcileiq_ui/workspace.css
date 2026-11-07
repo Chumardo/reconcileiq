@@ -77,8 +77,65 @@
     letter-spacing: -0.045em;
 }
 
+.ri-quality-matrix {
+    max-width: 45rem;
+    border: 1px solid #d9e2e5;
+    border-radius: 0.5rem;
+    overflow: auto;
+    background: #ffffff;
+}
+
+.ri-quality-matrix table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #15262d;
+    font-size: 0.875rem;
+    line-height: 1.3;
+}
+
+.ri-quality-matrix th,
+.ri-quality-matrix td {
+    padding: 0.55rem 0.85rem;
+    border-bottom: 1px solid #e8eef0;
+}
+
+.ri-quality-matrix th:first-child {
+    text-align: left;
+}
+
+.ri-quality-matrix thead th {
+    background: #eaf5f3;
+    color: #23514c;
+    font-weight: 650;
+}
+
+.ri-quality-matrix tbody th {
+    font-weight: 500;
+}
+
+.ri-quality-matrix :is(th, td):not(:first-child) {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ri-quality-matrix tbody td:last-child {
+    background: #f2f8f7;
+    font-weight: 650;
+}
+
+.ri-quality-matrix tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
 @media (max-width: 700px) {
     .stMainBlockContainer {
         padding: 2.8rem 1rem 2rem;
+    }
+
+    .ri-quality-matrix th,
+    .ri-quality-matrix td {
+        padding-inline: 0.5rem;
     }
 }

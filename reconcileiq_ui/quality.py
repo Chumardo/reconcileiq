@@ -1,13 +1,13 @@
 """Source-specific quality indicators and reconciliation exclusions."""
 
-import altair as alt
+from html import escape
+
 import pandas as pd
 import streamlit as st
 
 from reconcileiq import ReconciliationResult
 
 from .analysis import quality_by_source
-from .dashboard import INK, NAVY, TEAL, chart_style
 
 
 _SOURCES = [("source_a", "Source A"), ("source_b", "Source B")]
@@ -43,42 +43,31 @@ def _comparison_table(quality: dict, measures: list[tuple[str, str]]) -> None:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", height=37 + len(rows) * 35)
 
 
-def _issue_chart(quality: dict) -> None:
-    rows = pd.DataFrame(
-        [
-            {"issue": label, "source": name, "rows": quality[source][metric]}
-            for metric, label in _ISSUES
-            for source, name in _SOURCES
-        ]
-    )
-    source_order = [name for _, name in _SOURCES]
-    chart = alt.Chart(rows).encode(
-        y=alt.Y("issue:N", sort=[label for _, label in _ISSUES], axis=alt.Axis(ticks=False), title=None),
-        yOffset=alt.YOffset("source:N", sort=source_order),
-        x=alt.X(
-            "rows:Q",
-            scale=alt.Scale(domain=[0, max(1, rows["rows"].max() * 1.2)], nice=False),
-            axis=alt.Axis(tickMinStep=1, title="Physical source rows"),
-        ),
-        tooltip=[
-            alt.Tooltip("issue:N", title="Issue"),
-            alt.Tooltip("source:N", title="Source"),
-            alt.Tooltip("rows:Q", title="Rows", format=","),
-        ],
-    )
-    bars = chart.mark_bar(size=11, cornerRadiusEnd=2).encode(
-        color=alt.Color(
-            "source:N",
-            scale=alt.Scale(domain=source_order, range=[TEAL, NAVY]),
-            legend=alt.Legend(orient="top", title=None),
+def _issue_matrix(quality: dict) -> str:
+    rows = [
+        (label, quality["source_a"][metric], quality["source_b"][metric])
+        for metric, label in _ISSUES
+    ]
+    rows.sort(key=lambda row: (-(row[1] + row[2]), row[0].casefold()))
+
+    body = []
+    for label, count_a, count_b in rows:
+        cells = "".join(
+            f"<td>{count:,}</td>" if count else "<td>—</td>"
+            for count in (count_a, count_b, count_a + count_b)
         )
-    )
-    labels = chart.mark_text(align="left", dx=5, color=INK, fontSize=12).encode(text=alt.Text("rows:Q", format=","))
-    st.altair_chart(
-        chart_style((bars + labels).properties(height=220, description="Quality issues by physical source.")),
-        width="stretch",
-        theme=None,
-    )
+        body.append(f'<tr><th scope="row">{escape(label)}</th>{cells}</tr>')
+
+    return f"""
+<div class="ri-quality-matrix">
+    <table aria-label="Data Quality Issue Matrix">
+        <thead>
+            <tr><th scope="col">Issue</th><th scope="col">Source A</th><th scope="col">Source B</th><th scope="col">Total</th></tr>
+        </thead>
+        <tbody>{"".join(body)}</tbody>
+    </table>
+</div>
+"""
 
 
 def render_quality(result: ReconciliationResult) -> None:
@@ -86,9 +75,12 @@ def render_quality(result: ReconciliationResult) -> None:
     if not result.records:
         st.info("The two sources contain no transaction rows to assess. The counts below are zero.")
 
-    st.subheader("Issue counts by source")
-    st.caption("Counts refer to physical source rows. A row can contribute to several issues.")
-    _issue_chart(quality)
+    st.subheader("Data Quality Issue Matrix")
+    st.caption(
+        "A dash means zero. Issue counts can overlap: totals count issue occurrences, "
+        "not necessarily distinct affected source rows."
+    )
+    st.html(_issue_matrix(quality))
 
     missing_column, exclusions_column = st.columns(2)
     with missing_column:

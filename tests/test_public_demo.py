@@ -48,7 +48,7 @@ def test_public_entrypoint_uses_only_the_bundled_run_even_with_uploads_configure
 
     app.radio(key="workspace_view").set_value("Data Quality").run()
     assert not app.exception
-    assert any(item.value == "Issue counts by source" for item in app.subheader)
+    assert any(item.value == "Data Quality Issue Matrix" for item in app.subheader)
 
     app.button(key="clear_audit").click().run()
     assert app.radio(key="workspace_view").value == "Setup"

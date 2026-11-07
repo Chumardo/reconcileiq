@@ -44,7 +44,10 @@ def test_demo_opens_overview_and_keeps_results_across_workspace_views():
 
     show_view(app, "Data Quality")
     assert app.title[0].value == "Data quality"
-    assert any(heading.value == "Issue counts by source" for heading in app.subheader)
+    assert [heading.value for heading in app.subheader] == [
+        "Data Quality Issue Matrix", "Missing required values", "Reconciliation exclusions",
+    ]
+    assert any("totals count issue occurrences" in caption.value for caption in app.caption)
 
 
 def test_uploaded_csv_sources_can_run_with_mapped_composite_keys(private_uploads):

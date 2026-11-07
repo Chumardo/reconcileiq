@@ -1,4 +1,5 @@
 from decimal import Decimal
+from xml.etree import ElementTree
 
 import pandas as pd
 import pytest
@@ -80,6 +81,24 @@ def test_quality_metrics_distinguish_repeated_and_quarantined_counterpart_rows(a
     assert (a["rows_missing_required"], b["rows_missing_required"]) == (3, 1)
     assert (a["excluded_rows"], b["excluded_rows"]) == (3, 1)
     assert (a["amounts_excluded"], b["amounts_excluded"]) == (2, 1)
+
+
+def test_issue_matrix_renders_exact_audit_counts_sorted_by_total_then_label(audit_result):
+    pytest.importorskip("streamlit")
+    from reconcileiq_ui.quality import _issue_matrix
+
+    matrix = ElementTree.fromstring(_issue_matrix(quality_by_source(audit_result)))
+    assert [cell.text for cell in matrix.findall("./table/thead/tr/th")] == [
+        "Issue", "Source A", "Source B", "Total",
+    ]
+    assert [tuple(cell.text for cell in row) for row in matrix.findall("./table/tbody/tr")] == [
+        ("Invalid currency", "1", "1", "2"),
+        ("Rows with repeated keys", "2", "—", "2"),
+        ("Invalid amount", "1", "—", "1"),
+        ("Invalid status", "1", "—", "1"),
+        ("Null or blank key", "1", "—", "1"),
+        ("Invalid key type", "—", "—", "—"),
+    ]
 
 
 def test_currency_totals_are_separate_and_decimal_safe(audit_result):
