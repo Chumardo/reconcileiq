@@ -2,7 +2,7 @@
 
 ReconcileIQ compares two transaction sources, explains differences, and produces an Excel audit report with a trace back to the original rows. It is a self-directed portfolio project for financial operations and data quality. All bundled records, examples, and screenshots use synthetic data.
 
-**[🚀 Try the Live Demo](https://reconcileiq-demo.streamlit.app/)**
+**[Launch Live Demo](https://reconcileiq-demo.streamlit.app/)**
 
 Explore the interactive reconciliation dashboard, investigate synthetic transaction discrepancies, and review downloadable Excel audit reports. No installation required.
 
@@ -10,7 +10,7 @@ The public demo uses synthetic data and disables file uploads.
 
 ![ReconcileIQ overview showing the synthetic demo’s match rate, eligible exceptions, and quarantined records](docs/screenshots/phase4-overview.jpg)
 
-[Exception Explorer](docs/screenshots/phase4-explorer.jpg) · [Excel audit report](docs/screenshots/phase4-excel-report.jpg) · [Case study](docs/case_study.md) · [Upwork portfolio materials](docs/upwork_portfolio.md)
+[Exception Explorer](docs/screenshots/phase4-explorer.jpg) · [Excel audit report](docs/screenshots/phase4-excel-report.jpg) · [Case study](docs/case_study.md) · [Upwork portfolio materials](docs/upwork_portfolio.md) · [GitHub repository](https://github.com/Chumardo/reconcileiq)
 
 ## Run locally
 
@@ -75,7 +75,7 @@ The Streamlit workspace, CLI, and Python API call the same reconciliation engine
 - The Excel export writes a monetary value as numeric only when a decimal round trip preserves it at Excel’s precision. Higher-precision amounts are exported as exact text. Precomputed totals include those values. The workbook marks unusually long evidence that exceeds Excel’s text limit. [Microsoft’s Excel precision documentation](https://support.microsoft.com/en-us/excel/change-formula-recalculation-iteration-or-precision-in-excel)
 - The CLI writes `report.json` and `records.csv`. JSON preserves raw evidence and serializes monetary values as decimal strings. Formula-like text in CSV identifier and status fields receives a protective prefix. See [the bundled mapping](data/demo/config.json) for the CLI configuration format. Use a decimal string for fractional `amount_tolerance` settings.
 - The private launch command allows uploads up to 15 MiB per file. CSV and XLSX worksheet limits are 100,000 data rows, 128 columns, and 2,000,000 data cells. XLSX packages also have workbook-wide limits of 96 MiB of expanded content and 1,024 archive entries. Use **Clear audit** to release the active audit from the session.
-- Demo mode admits only two bundled sources, with limits of 1 MiB and 12,000 data rows per file. It shares a single synthetic audit and workbook per running process. A cold start can delay the first use. Host capacity, concurrent traffic, and session limits still need validation before public launch. [Security and dependency review](docs/security_review.md)
+- Demo mode admits only two bundled sources, with limits of 1 MiB and 12,000 data rows per file. It shares a single synthetic audit and workbook per running process. A cold start can delay the first use. Host capacity, sustained concurrency, and session limits have not been measured. [Security and dependency review](docs/security_review.md)
 
 ## Tests and independent verification
 

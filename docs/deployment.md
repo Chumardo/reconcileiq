@@ -1,12 +1,12 @@
 # Streamlit Community Cloud deployment
 
-ReconcileIQ is prepared for a synthetic-only portfolio demo. The local demo uses the same entry point intended for Community Cloud. The hosted build and post-deployment checks remain to be verified in the target workspace.
+The [public ReconcileIQ demo](https://reconcileiq-demo.streamlit.app/) runs on Streamlit Community Cloud from [Chumardo/reconcileiq](https://github.com/Chumardo/reconcileiq). The local synthetic demo uses the same entry point. Use the checks below to verify release updates.
 
 ## Review the release contents
 
-1. After publication approval, create the dedicated public repository `chumardo/reconcileiq` with the reviewed release files at its root. Initialize fresh Git history from that snapshot. Keep the parent workspace and its `.git` directory outside the release.
+1. Keep reviewed release files at the root of the dedicated repository. Keep the parent workspace and its `.git` directory outside the release.
 2. Review the files to be staged. Include the two app entry points, `.streamlit/config.toml`, `pyproject.toml`, `requirements.txt`, the engine, workspace modules, tests, scripts, docs, and the four bundled files in `data/demo/`. Keep virtual environments, caches, `.streamlit/secrets.toml`, local uploads, generated reports, and unrelated files out of the repository. `.gitignore` helps enforce those exclusions for untracked files. Inspect the staged filenames before committing.
-3. Include the [MIT License](../LICENSE) and use `main` for the first push. Review the public commit author name and GitHub noreply email before committing.
+3. Retain the [MIT License](../LICENSE) and review public commit metadata before publishing changes to `main`.
 
 Community Cloud starts from the repository root and resolves the application environment from its dependency file. Keep `.streamlit/config.toml` and `requirements.txt` at that root alongside `demo_app.py`. The requirements pin the direct and transitive Python 3.12 runtime dependencies and install the ReconcileIQ package. [Community Cloud file organization](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/file-organization) · [Community Cloud dependency selection](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies)
 
@@ -37,4 +37,4 @@ The `demo_app.py` entry point always uses the two bundled synthetic CSVs, with a
 4. Download the XLSX and reopen it. Confirm that all seven sheets are present and that the Executive Summary and Currency Summary agree with the workspace.
 5. Repeat with a narrow browser window. Inspect navigation, overflow, and any displayed errors. Check the deployment logs for dependency or startup errors and confirm that viewer-facing screens reveal only synthetic information.
 
-The app reuses one synthetic audit and workbook per process to bound repeated work. A process restart can delay the first request. There is no app-level execution timeout or visitor quota, and sustained concurrency has yet to be measured on Community Cloud. Review logs and resource use during the hosted smoke test before opening access. [Community Cloud platform limits](https://docs.streamlit.io/deploy/streamlit-community-cloud/status) · [Project security review](security_review.md)
+The app reuses one synthetic audit and workbook per process to bound repeated work. A process restart can delay the first request. There is no app-level execution timeout or visitor quota, and sustained concurrency has yet to be measured on Community Cloud. Review logs and resource use after deployment updates. [Community Cloud platform limits](https://docs.streamlit.io/deploy/streamlit-community-cloud/status) · [Project security review](security_review.md)
