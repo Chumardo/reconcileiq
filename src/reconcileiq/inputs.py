@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Collection
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from io import BytesIO, TextIOWrapper
@@ -16,9 +17,9 @@ from openpyxl.utils.cell import coordinate_to_tuple
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.xml.functions import iterparse
 
-
-class InputError(ValueError):
-    """A transaction file could not be loaded as a table."""
+from .models import XlsxNumericKey
+from .preflight import InputError, UploadLimits, ValidatedUpload
+from .validation import MAX_XLSX_KEY_DIGITS
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,10 +92,10 @@ def _cell_value(cell):
     return cell.value
 
 
-def _stored_amounts(worksheet, amount_index: int) -> dict[int, Decimal]:
+def _stored_numbers(worksheet, columns: set[int]) -> dict[tuple[int, int], str]:
     namespace = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
     cell_tag, value_tag, row_tag, formula_tag = (namespace + name for name in ("c", "v", "row", "f"))
-    amounts = {}
+    numbers = {}
     row_number = 0
     # The read-only worksheet owns relationship resolution and the ZIP handle.
     # Read its XML for the original numeric tokens before openpyxl casts them.
@@ -110,16 +111,16 @@ def _stored_amounts(worksheet, amount_index: int) -> dict[int, Decimal]:
                     cell_row, column = coordinate_to_tuple(reference)
                 else:
                     cell_row, column = row_number, column + 1
-                if column == amount_index + 1 and cell.get("t", "n") == "n":
+                if column in columns and cell.get("t", "n") == "n":
                     value = cell.findtext(value_tag)
                     if value and cell.find(formula_tag) is None:
-                        amounts[cell_row] = Decimal(value)
+                        numbers[cell_row, column] = value
             element.clear()
-    return amounts
+    return numbers
 
 
 def _load_xlsx(
-    file: BinaryIO, sheet: str | None, amount_column: str | None
+    file: BinaryIO, sheet: str | None, amount_column: str | None, integer_key_columns: Collection[str],
 ) -> tuple[pd.DataFrame, tuple[int, ...]]:
     workbook = load_workbook(file, read_only=True, data_only=False, keep_links=False)
     try:
@@ -138,8 +139,10 @@ def _load_xlsx(
         width = max((index for index, value in enumerate(header_row, 1) if value is not None), default=0)
         headers = header_row[:width]
         _validate_headers(headers)
-        amount_index = headers.index(amount_column) if amount_column in headers else None
-        amounts = _stored_amounts(worksheet, amount_index) if amount_index is not None else {}
+        amount_index = headers.index(amount_column) + 1 if amount_column in headers else None
+        key_indexes = {index for index, header in enumerate(headers, 1) if header in integer_key_columns}
+        exact_indexes = key_indexes | ({amount_index} if amount_index is not None else set())
+        stored = _stored_numbers(worksheet, exact_indexes) if exact_indexes else {}
 
         rows = []
         locations = []
@@ -149,12 +152,22 @@ def _load_xlsx(
                 continue
             if any(value is not None for value in values[width:]):
                 raise InputError(f"Worksheet {sheet!r} row {row_number} has data outside the headers.")
-            if amount_index is not None and amount_index < len(values):
-                cell = cell_row[amount_index]
+            for column in exact_indexes:
+                if column > len(values):
+                    continue
+                cell = cell_row[column - 1]
                 if cell.data_type == "n" and isinstance(cell.value, (float, int)):
-                    if cell.row not in amounts:
-                        raise InputError(f"Cannot read the stored amount at {sheet!r}!{cell.coordinate}.")
-                    values[amount_index] = amounts[cell.row]
+                    token = stored.get((cell.row, column))
+                    if token is None:
+                        label = "amount" if column == amount_index else "integer key"
+                        raise InputError(f"Cannot read the stored {label} at {sheet!r}!{cell.coordinate}.")
+                    if column in key_indexes:
+                        # Preserve existing integer evidence when it represents the token verbatim.
+                        if (column == amount_index or not isinstance(cell.value, int)
+                                or len(token.lstrip("-")) > MAX_XLSX_KEY_DIGITS or str(cell.value) != token):
+                            values[column - 1] = XlsxNumericKey(token)
+                    else:
+                        values[column - 1] = Decimal(token)
             rows.append(values[:width] + [None] * max(0, width - len(values)))
             locations.append(row_number)
         return pd.DataFrame(rows, columns=headers, dtype=object), tuple(locations)
@@ -163,16 +176,22 @@ def _load_xlsx(
 
 
 def load_source(
-    path: str | Path, *, sheet: str | None = None, amount_column: str | None = None
+    path: str | Path, *, sheet: str | None = None, amount_column: str | None = None,
+    integer_key_columns: Collection[str] = (), workbook_limits: UploadLimits = UploadLimits(),
 ) -> tuple[pd.DataFrame, tuple[int, ...]]:
     """Return a source frame and the corresponding 1-based file or worksheet rows.
 
-    Specify the XLSX amount column to parse its native numeric cells directly
-    into Decimal from their stored text. Text cells are always read verbatim.
+    Specify XLSX amount and integer key columns to read native numeric cells
+    from their stored tokens. Text cells are always read verbatim.
     """
     path = Path(path)
     try:
         with path.open("rb") as file:
+            if path.suffix.lower() == ".xlsx":
+                upload = ValidatedUpload(str(path), file.read(workbook_limits.max_bytes + 1), workbook_limits)
+                return load_validated_source(
+                    upload, sheet=sheet, amount_column=amount_column, integer_key_columns=integer_key_columns,
+                )
             return _load_source_stream(file, path, sheet=sheet, amount_column=amount_column)
     except OSError as error:
         raise InputError(f"{path}: {error}") from error
@@ -184,15 +203,39 @@ def load_source_bytes(
     *,
     sheet: str | None = None,
     amount_column: str | None = None,
+    integer_key_columns: Collection[str] = (),
+    workbook_limits: UploadLimits = UploadLimits(),
     max_csv_rows: int | None = None,
     max_csv_columns: int | None = None,
     max_csv_cells: int | None = None,
 ) -> tuple[pd.DataFrame, tuple[int, ...]]:
-    """Read prevalidated upload bytes using the same parser as local files."""
+    """Read upload bytes with the same workbook checks as local files."""
+    if Path(filename).suffix.lower() == ".xlsx":
+        upload = ValidatedUpload(filename, content, workbook_limits)
+        return load_validated_source(
+            upload, sheet=sheet, amount_column=amount_column, integer_key_columns=integer_key_columns,
+        )
     with BytesIO(content) as file:
         return _load_source_stream(
             file, Path(filename), sheet=sheet, amount_column=amount_column,
             max_csv_rows=max_csv_rows, max_csv_columns=max_csv_columns, max_csv_cells=max_csv_cells,
+        )
+
+
+def load_validated_source(
+    upload: ValidatedUpload,
+    *,
+    sheet: str | None = None,
+    amount_column: str | None = None,
+    integer_key_columns: Collection[str] = (),
+) -> tuple[pd.DataFrame, tuple[int, ...]]:
+    """Read the immutable bytes already checked against the caller's limits."""
+    limits = upload.limits
+    with BytesIO(upload.content) as file:
+        return _load_source_stream(
+            file, Path(upload.filename), sheet=sheet, amount_column=amount_column,
+            integer_key_columns=integer_key_columns,
+            max_csv_rows=limits.max_rows, max_csv_columns=limits.max_columns, max_csv_cells=limits.max_cells,
         )
 
 
@@ -202,6 +245,7 @@ def _load_source_stream(
     *,
     sheet: str | None,
     amount_column: str | None,
+    integer_key_columns: Collection[str] = (),
     max_csv_rows: int | None = None,
     max_csv_columns: int | None = None,
     max_csv_cells: int | None = None,
@@ -213,7 +257,7 @@ def _load_source_stream(
                 raise InputError("Sheet selection is only available for XLSX inputs.")
             return _load_csv(file, max_rows=max_csv_rows, max_columns=max_csv_columns, max_cells=max_csv_cells)
         if suffix == ".xlsx":
-            return _load_xlsx(file, sheet, amount_column)
+            return _load_xlsx(file, sheet, amount_column, integer_key_columns)
         raise InputError("Expected a .csv or .xlsx file.")
     except (
         OSError, ValueError, BadZipFile, SyntaxError, InvalidFileException, InvalidOperation,

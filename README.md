@@ -1,12 +1,10 @@
 # ReconcileIQ
 
-ReconcileIQ compares two transaction sources, explains differences, and produces an Excel audit report with a trace back to the original rows. It is a self-directed portfolio project for financial operations and data quality. All bundled records, examples, and screenshots use synthetic data.
+ReconcileIQ compares two transaction exports, shows the source rows behind each difference, and produces a seven-sheet Excel audit. It is a self-directed portfolio project for financial operations and data quality. All bundled records, examples, and screenshots use synthetic data.
 
 **[Launch Live Demo](https://reconcileiq-demo.streamlit.app/)**
 
-Explore the interactive reconciliation dashboard, investigate synthetic transaction discrepancies, and review downloadable Excel audit reports. No installation required.
-
-The public demo uses synthetic data and disables file uploads.
+Choose **Load demo dataset** and open **Exception Explorer** to investigate an example. Download the workbook from **Overview**. The public demo uses synthetic data and disables file uploads.
 
 ![ReconcileIQ overview showing the synthetic demo’s match rate, eligible exceptions, and quarantined records](docs/screenshots/phase4-overview.jpg)
 
@@ -70,11 +68,11 @@ The Streamlit workspace, CLI, and Python API call the same reconciliation engine
 ## Inputs, outputs, and limits
 
 - CSV input uses UTF-8 and commas. The header row must contain unique, nonblank names. Key columns, amount, currency, and status are required. Original row IDs are optional, and physical row numbers are retained.
-- Text keys preserve case and leading zeros after trimming whitespace. Integer keys normalize signs and leading zeros. The amount parser accepts decimal text, integers, and `Decimal`, with up to 38 integer digits and 18 fractional places. Status comparisons are case-sensitive. Currencies use three uppercase letters.
-- XLSX formulas and error cells in audited fields are flagged as invalid. The parser reads native amounts from the stored numeric value. Store long values as text in Excel to preserve every digit.
+- Text keys preserve case and leading zeros after trimming whitespace and require text cells. An explicitly configured integer key normalizes signs and leading zeros in digit text. For native XLSX numeric keys, the workbook reader compares exact stored values such as `123`, `123.0`, and `1.23E2` as the same integer. It accepts integral values up to 309 digits. Missing keys are flagged separately, and fractional numbers, dates, booleans, formulas, and error cells are invalid keys. The source evidence keeps the stored token when its spelling differs from a canonical integer.
+- The amount parser accepts decimal text, integers, and `Decimal`, with up to 38 integer digits and 18 fractional places. It reads native XLSX amounts from the stored numeric value. Formulas and Excel error cells are invalid in audited fields. Malformed numeric storage can cause a file error before row validation. Store long identifiers as text in Excel to preserve digits Excel would round before saving. Status comparisons are case-sensitive. Currencies use three uppercase letters.
 - The Excel export writes a monetary value as numeric only when a decimal round trip preserves it at Excel’s precision. Higher-precision amounts are exported as exact text. Precomputed totals include those values. The workbook marks unusually long evidence that exceeds Excel’s text limit. [Microsoft’s Excel precision documentation](https://support.microsoft.com/en-us/excel/change-formula-recalculation-iteration-or-precision-in-excel)
 - The CLI writes `report.json` and `records.csv`. JSON preserves raw evidence and serializes monetary values as decimal strings. Formula-like text in CSV identifier and status fields receives a protective prefix. See [the bundled mapping](data/demo/config.json) for the CLI configuration format. Use a decimal string for fractional `amount_tolerance` settings.
-- The private launch command allows uploads up to 15 MiB per file. CSV and XLSX worksheet limits are 100,000 data rows, 128 columns, and 2,000,000 data cells. XLSX packages also have workbook-wide limits of 96 MiB of expanded content and 1,024 archive entries. Use **Clear audit** to release the active audit from the session.
+- The private launch command allows uploads up to 15 MiB per file. It limits CSV inputs to 100,000 data rows, 128 columns, and 2,000,000 data cells. The private UI and CLI both apply those same row, column, and cell limits to XLSX worksheets. Before opening a workbook, both check the 15 MiB file cap, 96 MiB total expansion cap, and 1,024 archive-entry cap. Entries expanding to at least 1 MiB may expand by at most 1,000:1. Use **Clear audit** to release the active audit from the session.
 - Demo mode admits only two bundled sources, with limits of 1 MiB and 12,000 data rows per file. It shares a single synthetic audit and workbook per running process. A cold start can delay the first use. Host capacity, sustained concurrency, and session limits have not been measured. [Security and dependency review](docs/security_review.md)
 
 ## Tests and independent verification

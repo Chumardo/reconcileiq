@@ -20,7 +20,7 @@ python -m pip check
 python -m streamlit run demo_app.py --server.address 127.0.0.1
 ```
 
-The `demo_app.py` entry point always uses the two bundled synthetic CSVs, with a 1 MiB and 12,000 data-row limit per file. It exposes no file uploader and requires no secrets or environment variables. The shared `.streamlit/config.toml` sets `server.maxUploadSize = 0` to reject nonempty uploads at the server. Keep that setting in the hosted environment. For local upload use, follow the separate private launch command in the [README](../README.md).
+The `demo_app.py` entry point uses the two bundled synthetic CSVs, with a 1 MiB and 12,000 data-row limit per file. It exposes no file uploader and requires no secrets or environment variables. Keep `server.maxUploadSize = 0` in the hosted environment to reject nonempty uploads at the server. For local files, use the separate private launch command in the [README](../README.md). The private UI and CLI check XLSX package and worksheet limits before parsing.
 
 ## Deploy after approval
 

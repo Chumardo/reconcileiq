@@ -10,7 +10,7 @@ Python development, reconciliation rules, and audit reporting
 
 ## Project description
 
-ReconcileIQ is a self-directed portfolio project that compares transaction exports and explains what matched, what needs review, and where to find the source rows. The Python engine uses exact decimal comparisons and configurable tolerances. A Streamlit dashboard lets reviewers filter exceptions and inspect duplicate groups, while a seven-sheet Excel report preserves the evidence and rules. The demo uses 20,001 synthetic source rows and 14 documented anomaly scenarios.
+I built ReconcileIQ to compare transaction exports such as a ledger and a settlement file. In the local app, set matching keys and an amount tolerance, review discrepancies beside their source rows, and export a seven-sheet Excel audit. Repeated keys are set aside so they cannot multiply matches, and currency totals stay separate. The public demo uses 20,001 synthetic rows. This is a self-directed portfolio project.
 
 ## Skills and technologies
 

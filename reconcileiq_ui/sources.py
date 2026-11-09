@@ -1,4 +1,4 @@
-"""Adapt uploaded bytes and bundled fixtures to the Phase 1 file loader."""
+"""Adapt uploaded bytes and bundled fixtures to the shared file loader."""
 
 from __future__ import annotations
 
@@ -14,9 +14,8 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
 from reconcileiq import ConfigurationError, ReconciliationConfig, ReconciliationResult, reconcile
-from reconcileiq.inputs import InputError, load_source_bytes
-
-from .upload_limits import UploadLimits, validate_upload
+from reconcileiq.inputs import InputError, load_validated_source
+from reconcileiq.preflight import UploadLimits, ValidatedUpload
 
 
 DEMO_DIRECTORY = Path(__file__).resolve().parents[1] / "data" / "demo"
@@ -36,19 +35,23 @@ class AuditRun:
 
 def list_worksheets(filename: str, content: bytes, *, limits: UploadLimits = UploadLimits()) -> tuple[str, ...]:
     """Return XLSX worksheet names in workbook order, or an empty tuple for CSV."""
-    if validate_upload(filename, content, limits) == ".csv":
+    return list_validated_worksheets(ValidatedUpload(filename, content, limits))
+
+
+def list_validated_worksheets(upload: ValidatedUpload) -> tuple[str, ...]:
+    if upload.suffix == ".csv":
         return ()
     try:
-        with BytesIO(content) as stream:
+        with BytesIO(upload.content) as stream:
             workbook = load_workbook(stream, read_only=True, keep_links=False)
             try:
                 sheets = tuple(sheet.title for sheet in workbook.worksheets)
             finally:
                 workbook.close()
     except (OSError, ValueError, LookupError, BadZipFile, SyntaxError, InvalidFileException, TypeError, AttributeError) as error:
-        raise InputError(f"{filename}: could not open the workbook. {error}") from error
+        raise InputError(f"{upload.filename}: could not open the workbook. {error}") from error
     if not sheets:
-        raise InputError(f"{filename}: the workbook has no worksheets.")
+        raise InputError(f"{upload.filename}: the workbook has no worksheets.")
     return sheets
 
 
@@ -58,13 +61,13 @@ def parse_upload(
     *,
     sheet: str | None = None,
     amount_column: str | None = None,
+    integer_key_columns: Collection[str] = (),
     limits: UploadLimits = UploadLimits(),
 ) -> tuple[pd.DataFrame, tuple[int, ...]]:
     """Read an upload with the same validation and row locators as the CLI."""
-    validate_upload(filename, content, limits)
-    return load_source_bytes(
-        filename, content, sheet=sheet, amount_column=amount_column,
-        max_csv_rows=limits.max_rows, max_csv_columns=limits.max_columns, max_csv_cells=limits.max_cells,
+    return load_validated_source(
+        ValidatedUpload(filename, content, limits), sheet=sheet, amount_column=amount_column,
+        integer_key_columns=integer_key_columns,
     )
 
 

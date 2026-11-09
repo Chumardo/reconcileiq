@@ -6,13 +6,29 @@ from numbers import Integral
 
 import pandas as pd
 
+from .models import XlsxNumericKey
+
 
 MAX_INTEGER_DIGITS = 38
 MAX_FRACTION_DIGITS = 18
+MAX_XLSX_KEY_DIGITS = 309
 INVALID_VALUE_FLAGS = frozenset({"invalid_amount", "invalid_status", "invalid_currency"})
 _DECIMAL_TEXT = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)")
 _INTEGER_TEXT = re.compile(r"[+-]?[0-9]+")
 _CURRENCY = re.compile(r"[A-Z]{3}")
+
+
+def _xlsx_integer_key(value: XlsxNumericKey) -> str | None:
+    try:
+        number = Decimal(value.value)
+    except InvalidOperation:
+        return None
+    if not number.is_finite() or number.adjusted() >= MAX_XLSX_KEY_DIGITS:
+        return None
+    integer = number.to_integral_value()
+    if number != integer:
+        return None
+    return format(integer, "f") if integer else "0"
 
 
 def normalize_key(values: tuple, kinds: tuple[str, ...]) -> tuple[tuple[str, ...] | None, set[str]]:
@@ -30,6 +46,12 @@ def normalize_key(values: tuple, kinds: tuple[str, ...]) -> tuple[tuple[str, ...
 
         if kind == "text" and isinstance(value, str):
             parts.append(value)
+        elif kind == "integer" and isinstance(value, XlsxNumericKey):
+            normalized = _xlsx_integer_key(value)
+            if normalized is None:
+                issues.add("invalid_key")
+            else:
+                parts.append(normalized)
         elif kind == "integer" and isinstance(value, Integral) and not isinstance(value, bool):
             parts.append(str(value))
         elif kind == "integer" and isinstance(value, str) and _INTEGER_TEXT.fullmatch(value):
@@ -41,6 +63,12 @@ def normalize_key(values: tuple, kinds: tuple[str, ...]) -> tuple[tuple[str, ...
 
 
 def parse_amount(value: object) -> Decimal | None:
+    # A workbook column can be explicitly mapped as both an integer key and an amount.
+    if isinstance(value, XlsxNumericKey):
+        try:
+            value = Decimal(value.value)
+        except InvalidOperation:
+            return None
     if isinstance(value, Decimal):
         amount = value
     elif isinstance(value, Integral) and not isinstance(value, bool):

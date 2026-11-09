@@ -1,10 +1,13 @@
 from io import BytesIO
+import json
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook
 import pytest
 
+from reconcileiq.cli import main
 from reconcileiq.inputs import InputError
+from reconcileiq.preflight import ValidatedUpload
 from reconcileiq_ui.sources import UploadLimits, list_worksheets, parse_upload
 
 
@@ -28,6 +31,32 @@ def _replace_part(content, name, transform):
             raw = source.read(part)
             target.writestr(part, transform(raw) if part == name else raw)
     return result.getvalue()
+
+
+def _with_parts(content, parts):
+    result = BytesIO(content)
+    with ZipFile(result, "a", ZIP_DEFLATED) as archive:
+        for name, data in parts:
+            archive.writestr(name, data)
+    return result.getvalue()
+
+
+def _compressed_part():
+    return _with_parts(_workbook(), [("xl/media/high-ratio.bin", b"A" * (2 * 1024**2))])
+
+
+def _cli_arguments(tmp_path, content):
+    workbook = tmp_path / "supplier.xlsx"
+    workbook.write_bytes(content)
+    config = tmp_path / "mapping.json"
+    mapping = {"keys": ["ID"], "amount": "Amount", "status": "Status", "currency": "Currency"}
+    config.write_text(json.dumps({"source_a": mapping, "source_b": mapping}), encoding="utf-8")
+    return [
+        "--source-a", str(workbook),
+        "--source-b", str(workbook),
+        "--config", str(config),
+        "--output-dir", str(tmp_path / "results"),
+    ]
 
 
 @pytest.mark.parametrize("read", [list_worksheets, parse_upload])
@@ -115,3 +144,60 @@ def test_xlsx_rejects_unknown_xml_encoding_with_upload_error():
     )
     with pytest.raises(InputError, match="unknown encoding"):
         parse_upload("bad-encoding.xlsx", content)
+
+
+def test_valid_workbook_uses_the_same_input_policy_in_cli_and_private_ui(tmp_path):
+    workbook = Workbook()
+    workbook.active.append(["ID", "Amount", "Status", "Currency"])
+    workbook.active.append(["001", "10.00", "settled", "USD"])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    content = buffer.getvalue()
+
+    validated = ValidatedUpload("supplier.xlsx", content, UploadLimits())
+    assert validated.suffix == ".xlsx"
+    frame, locators = parse_upload("supplier.xlsx", content)
+    assert frame["ID"].tolist() == ["001"]
+    assert locators == (2,)
+    assert main(_cli_arguments(tmp_path, content)) == 0
+    report = json.loads((tmp_path / "results" / "report.json").read_text(encoding="utf-8"))
+    assert report["records"][0]["classification"] == "matched"
+    assert report["records"][0]["source_a"]["row_number"] == 2
+
+
+@pytest.mark.parametrize(
+    "content_factory, message",
+    [
+        (lambda: b"x" * (15 * 1024**2 + 1), "upload size limit"),
+        (lambda: _with_parts(_workbook(), (
+            (f"xl/media/part-{index}.bin", b"") for index in range(1_024)
+        )), "ZIP-entry limit"),
+        (_compressed_part, "1,000:1 expansion ratio limit"),
+        (lambda: _workbook("A100002"), "100,000-data-row limit"),
+        (lambda: _workbook()[:-32], "zip file"),
+    ],
+)
+def test_cli_and_private_ui_reject_unsafe_xlsx_before_loading(
+    tmp_path, capsys, monkeypatch, content_factory, message,
+):
+    def unexpected_loader(*args, **kwargs):
+        pytest.fail("openpyxl was called before the XLSX preflight rejected the file")
+
+    monkeypatch.setattr("reconcileiq.inputs.load_workbook", unexpected_loader)
+    content = content_factory()
+    with pytest.raises(InputError, match=message):
+        parse_upload("supplier.xlsx", content)
+
+    with pytest.raises(SystemExit) as error:
+        main(_cli_arguments(tmp_path, content))
+    assert error.value.code == 2
+    assert message in capsys.readouterr().err
+    assert not (tmp_path / "results").exists()
+
+
+def test_xlsx_preflight_keeps_expanded_size_limit_and_allows_small_compressible_parts():
+    content = _with_parts(_workbook(), [("xl/media/small.bin", b"A" * (512 * 1024))])
+    assert list_worksheets("supplier.xlsx", content) == ("Sheet",)
+
+    with pytest.raises(InputError, match="expanded size limit"):
+        list_worksheets("supplier.xlsx", content, limits=UploadLimits(max_expanded_bytes=256 * 1024))

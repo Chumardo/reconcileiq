@@ -1,7 +1,18 @@
 """The row-level report contract used by the API and exporters."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class XlsxNumericKey:
+    """Original XLSX numeric token for an explicitly mapped integer key."""
+
+    value: str
+    kind: str = field(default="xlsx_number", init=False)
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,7 +14,7 @@ The Streamlit workspace summarizes the audit, lets a reviewer filter and inspect
 
 | Layer | Responsibility |
 | --- | --- |
-| Input and mapping | Read CSV or XLSX with pandas and openpyxl, retain source row references, and map headers to keys, amounts, currencies, and statuses. |
+| Input and mapping | Read CSV with Python’s `csv` module and XLSX with openpyxl. Retain original row numbers, then put the records in pandas frames and map each source’s columns. |
 | Reconciliation engine | Validate and normalize keys, group them with DuckDB, and compare amounts with Python `Decimal`. |
 | Review workspace | Display counts and currency totals, filter exceptions by classification and flags, and show both source rows and their applied rules. |
 | Audit outputs | Generate the XLSX workbook with openpyxl. The CLI also writes structured JSON and CSV from the same engine. |

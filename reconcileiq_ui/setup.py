@@ -10,10 +10,12 @@ import pandas as pd
 import streamlit as st
 
 from reconcileiq import ConfigurationError, ReconciliationConfig, SchemaError, reconcile
-from reconcileiq.inputs import InputError, UnsupportedCell
+from reconcileiq.config import ColumnMapping
+from reconcileiq.inputs import InputError, UnsupportedCell, load_validated_source
+from reconcileiq.preflight import UploadLimits, ValidatedUpload
 
 from .public_demo import demo_audit
-from .sources import AuditRun, UploadLimits, list_worksheets, parse_upload, run_demo, validate_mapping
+from .sources import AuditRun, list_validated_worksheets, run_demo, validate_mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +26,7 @@ class _Upload:
 
 @dataclass(frozen=True, slots=True)
 class _Preview:
-    upload: _Upload
+    upload: ValidatedUpload
     sheet: str | None
     sample: pd.DataFrame
     row_count: int
@@ -41,7 +43,7 @@ _FIELDS = (
 def _replace_upload(side: str, upload: _Upload | None) -> None:
     state = st.session_state
     state[f"setup_file_{side}"] = upload
-    for part in ("sheets", "sheet", "sheet_widget", "preview", "draft", "error"):
+    for part in ("validated", "sheets", "sheet", "sheet_widget", "preview", "draft", "error"):
         state.pop(f"setup_{part}_{side}", None)
     for role in ("keys", *(field[0] for field in _FIELDS)):
         state.pop(f"setup_mapping_{side}_{role}", None)
@@ -100,9 +102,13 @@ def _render_source(side: str, limits: UploadLimits) -> _Preview | None:
         st.button(f"Remove Source {side}", key=f"setup_remove_{side}", on_click=_remove_upload, args=(side,))
 
     try:
+        validated_key = f"setup_validated_{side}"
+        validated = state.get(validated_key)
         sheets_key = f"setup_sheets_{side}"
-        if sheets_key not in state:
-            state[sheets_key] = list_worksheets(upload.name, upload.content, limits=limits)
+        if validated is None or validated.limits != limits:
+            validated = ValidatedUpload(upload.name, upload.content, limits)
+            state[sheets_key] = list_validated_worksheets(validated)
+            state[validated_key] = validated
         sheets = state[sheets_key]
         sheet = None
         if sheets:
@@ -115,9 +121,9 @@ def _render_source(side: str, limits: UploadLimits) -> _Preview | None:
 
         preview_key = f"setup_preview_{side}"
         preview = state.get(preview_key)
-        if preview is None or preview.sheet != sheet:
-            frame, _ = parse_upload(upload.name, upload.content, sheet=sheet, limits=limits)
-            preview = _Preview(upload, sheet, frame.head(8).map(_preview_cell), len(frame))
+        if preview is None or preview.upload is not validated or preview.sheet != sheet:
+            frame, _ = load_validated_source(validated, sheet=sheet)
+            preview = _Preview(validated, sheet, frame.head(8).map(_preview_cell), len(frame))
             state[preview_key] = preview
     except (InputError, OSError) as error:
         st.error(f"Source {side} could not be read. Check the file and upload it again.")
@@ -174,7 +180,8 @@ def _render_key_types(mapping_a: dict, mapping_b: dict) -> tuple[str, ...]:
     if not keys_a or len(keys_a) != len(keys_b):
         return ()
     st.markdown("#### Key component types")
-    st.caption("Text preserves leading zeros and case. Integer keys normalize signs and leading zeros.")
+    st.caption("Text keys keep leading zeros and case. Integer keys compare whole numbers, "
+               "including native Excel numbers stored as 123.0.")
     remembered = st.session_state.get("setup_key_types", {})
     key_types = {}
     for index, pair in enumerate(zip(keys_a, keys_b, strict=True), start=1):
@@ -221,9 +228,10 @@ def _review_mapping(config: ReconciliationConfig) -> None:
         )
 
 
-def _for_audit(preview: _Preview, amount_column: str, limits: UploadLimits) -> tuple[pd.DataFrame, tuple[int, ...]]:
-    return parse_upload(
-        preview.upload.name, preview.upload.content, sheet=preview.sheet, amount_column=amount_column, limits=limits,
+def _for_audit(preview: _Preview, mapping: ColumnMapping, key_types: tuple[str, ...]) -> tuple[pd.DataFrame, tuple[int, ...]]:
+    return load_validated_source(
+        preview.upload, sheet=preview.sheet, amount_column=mapping.amount,
+        integer_key_columns=mapping.integer_key_columns(key_types),
     )
 
 
@@ -305,14 +313,14 @@ def render_setup(on_run: Callable[[AuditRun], None], *, public_demo: bool = Fals
     if st.button("Run reconciliation", type="primary", key="setup_run", disabled=config is None):
         try:
             with st.spinner("Validating rows and reconciling keys…"):
-                frame_a, locators_a = _for_audit(source_a, config.source_a.amount, limits)
-                frame_b, locators_b = _for_audit(source_b, config.source_b.amount, limits)
+                frame_a, locators_a = _for_audit(source_a, config.source_a, config.key_types)
+                frame_b, locators_b = _for_audit(source_b, config.source_b, config.key_types)
                 result = reconcile(frame_a, frame_b, config, row_numbers_a=locators_a, row_numbers_b=locators_b)
         except (InputError, SchemaError, OSError) as error:
             st.error("The audit could not run. Review the source files and mappings.")
             st.text(str(error))
         else:
             _finish_setup(AuditRun(
-                result, source_a.upload.name, source_b.upload.name, config,
+                result, source_a.upload.filename, source_b.upload.filename, config,
                 sheet_a=source_a.sheet, sheet_b=source_b.sheet,
             ), on_run)

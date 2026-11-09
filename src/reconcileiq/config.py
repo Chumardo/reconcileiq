@@ -37,6 +37,9 @@ class ColumnMapping:
             columns += (self.row_id,)
         return tuple(dict.fromkeys(columns))
 
+    def integer_key_columns(self, key_types: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(name for name, kind in zip(self.keys, key_types, strict=True) if kind == "integer")
+
 
 @dataclass(frozen=True, slots=True)
 class ReconciliationConfig:

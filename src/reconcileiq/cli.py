@@ -45,10 +45,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = _load_config(args.config)
         source_a, rows_a = load_source(
-            args.source_a, sheet=args.sheet_a, amount_column=config.source_a.amount
+            args.source_a, sheet=args.sheet_a, amount_column=config.source_a.amount,
+            integer_key_columns=config.source_a.integer_key_columns(config.key_types),
         )
         source_b, rows_b = load_source(
-            args.source_b, sheet=args.sheet_b, amount_column=config.source_b.amount
+            args.source_b, sheet=args.sheet_b, amount_column=config.source_b.amount,
+            integer_key_columns=config.source_b.integer_key_columns(config.key_types),
         )
         result = reconcile(source_a, source_b, config, row_numbers_a=rows_a, row_numbers_b=rows_b)
         write_outputs(
